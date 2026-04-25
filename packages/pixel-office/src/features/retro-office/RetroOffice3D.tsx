@@ -2376,6 +2376,8 @@ export function RetroOffice3D({
   streamingTextByAgentId = {},
   onStandupArrivalsChange,
   onStandupStartRequested,
+  onPhoneBoothClick,
+  onServerRackClick,
   onMonitorSelect,
   onAgentChatSelect,
   onAddAgent,
@@ -2491,6 +2493,8 @@ export function RetroOffice3D({
   streamingTextByAgentId?: Record<string, string | null>;
   onStandupArrivalsChange?: (arrivedAgentIds: string[]) => void;
   onStandupStartRequested?: () => void;
+  onPhoneBoothClick?: () => void;
+  onServerRackClick?: () => void;
   onMonitorSelect?: (agentId: string | null) => void;
   onAgentChatSelect?: (agentId: string) => void;
   onAddAgent?: () => void;
@@ -4649,6 +4653,10 @@ export function RetroOffice3D({
         return;
       }
       if (item.type === "phone_booth") {
+        if (onPhoneBoothClick) {
+          onPhoneBoothClick();
+          return;
+        }
         setFollowAgentId(null);
         setActiveKanbanUid(null);
         setActiveAtmUid(null);
@@ -4680,6 +4688,10 @@ export function RetroOffice3D({
         return;
       }
       if (item.type === "server_rack") {
+        if (onServerRackClick) {
+          onServerRackClick();
+          return;
+        }
         setFollowAgentId(null);
         setActiveKanbanUid(null);
         setActiveAtmUid(null);
@@ -4741,6 +4753,8 @@ export function RetroOffice3D({
       openKanbanBoard,
       onMonitorSelect,
       onStandupStartRequested,
+      onPhoneBoothClick,
+      onServerRackClick,
       qaTerminal,
       resolveAgentIdForDeskItem,
       planPath,
@@ -5254,8 +5268,7 @@ export function RetroOffice3D({
           4. Agent components read from `renderAgentsRef` via useFrame → pure Three.js mutations.
           5. Floor/walls render immediately (no Suspense). Only GLB models are suspended.
         */}
-        {!immersiveOverlayActive ? (
-          <Canvas
+        <Canvas
             key={canvasResetKey}
             orthographic
             dpr={[0.85, 1.5]}
@@ -5901,7 +5914,6 @@ export function RetroOffice3D({
               onClick={handleFloorClick}
             />
           </Canvas>
-        ) : null}
       </div>
 
       {/* New Idea 2: Camera preset buttons — top left. */}
