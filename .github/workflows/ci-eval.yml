@@ -200,11 +200,6 @@ jobs:
               body: message
             });
 
-      - name: Gate Check
-        if: steps.test.outputs.conclusion == 'failure'
-        run: |
-           echo "Tests failed. Failing the workflow to block merge."
-           exit 1
 
       - name: Post Conflict Resolution Guide
         if: steps.unwanted.outputs.has_unwanted == 'true'
@@ -282,3 +277,9 @@ jobs:
               repo: context.repo.repo,
               body: message
             });
+
+      - name: Gate Check
+        if: steps.test.outputs.conclusion == 'failure' || steps.unwanted.outputs.has_unwanted == 'true'
+        run: |
+           echo "Tests or PR structure validation failed. Failing the workflow to block merge."
+           exit 1
