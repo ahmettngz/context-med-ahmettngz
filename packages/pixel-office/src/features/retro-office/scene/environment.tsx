@@ -63,26 +63,53 @@ function FramedPicture({
 function TurkeyFlagArt() {
   return (
     <>
-      {/* Red background */}
-      <mesh position={[0, 0, 0]}>
-        <planeGeometry args={[0.52, 0.3]} />
-        <meshBasicMaterial color="#e30a17" side={2} />
-      </mesh>
-      {/* White crescent (outer circle) */}
-      <mesh position={[-0.04, 0.01, 0.001]}>
-        <circleGeometry args={[0.076, 32]} />
-        <meshBasicMaterial color="#ffffff" side={2} />
-      </mesh>
-      {/* Red inner circle to create crescent */}
-      <mesh position={[-0.01, 0.01, 0.002]}>
-        <circleGeometry args={[0.062, 32]} />
-        <meshBasicMaterial color="#e30a17" side={2} />
-      </mesh>
-      {/* White star */}
-      <mesh position={[0.072, 0.012, 0.002]} rotation={[0, 0, Math.PI / 10]}>
-        <circleGeometry args={[0.028, 5]} />
-        <meshBasicMaterial color="#ffffff" side={2} />
-      </mesh>
+      {/* ── Front face ── */}
+      <group>
+        {/* Red background */}
+        <mesh position={[0, 0, 0]}>
+          <planeGeometry args={[0.52, 0.3]} />
+          <meshBasicMaterial color="#e30a17" />
+        </mesh>
+        {/* White crescent outer */}
+        <mesh position={[-0.04, 0.01, 0.001]}>
+          <circleGeometry args={[0.076, 32]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {/* Red inner circle to carve crescent */}
+        <mesh position={[-0.01, 0.01, 0.002]}>
+          <circleGeometry args={[0.062, 32]} />
+          <meshBasicMaterial color="#e30a17" />
+        </mesh>
+        {/* White star */}
+        <mesh position={[0.072, 0.012, 0.002]} rotation={[0, 0, Math.PI / 10]}>
+          <circleGeometry args={[0.028, 5]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+      </group>
+
+      {/* ── Back face (mirrored X so crescent faces correctly) ── */}
+      <group rotation={[0, Math.PI, 0]}>
+        {/* Red background */}
+        <mesh position={[0, 0, 0]}>
+          <planeGeometry args={[0.52, 0.3]} />
+          <meshBasicMaterial color="#e30a17" />
+        </mesh>
+        {/* White crescent outer */}
+        <mesh position={[-0.04, 0.01, 0.001]}>
+          <circleGeometry args={[0.076, 32]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {/* Red inner circle to carve crescent */}
+        <mesh position={[-0.01, 0.01, 0.002]}>
+          <circleGeometry args={[0.062, 32]} />
+          <meshBasicMaterial color="#e30a17" />
+        </mesh>
+        {/* White star */}
+        <mesh position={[0.072, 0.012, 0.002]} rotation={[0, 0, Math.PI / 10]}>
+          <circleGeometry args={[0.028, 5]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+      </group>
     </>
   );
 }

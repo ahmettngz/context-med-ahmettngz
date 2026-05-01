@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { RetroOffice3D } from "@/features/retro-office/RetroOffice3D";
-import { X, UserPlus, Send, Server } from "lucide-react";
+import { X, UserPlus, Send, Server, Phone } from "lucide-react";
+import type { OfficeAgent } from "@/features/retro-office/core/types";
+import {
+  createAgentAvatarProfileFromSeed,
+  type AgentAvatarProfile,
+} from "@/lib/avatars/profile";
 
 /* ─── Types ─────────────────────────────────────── */
 type StaffStatus = "active" | "idle" | "busy" | "offline";
@@ -10,11 +15,15 @@ type StaffStatus = "active" | "idle" | "busy" | "offline";
 type Staff = {
   id: string;
   name: string;
-  apiKey: string;
-  personality: string;
-  status: StaffStatus;
-  avatar: string;
   role: string;
+  purpose: string;
+  emoji: string;
+  creature: string;
+  vibe: string;
+  responsibilities: string[];
+  status: StaffStatus;
+  avatarProfile: AgentAvatarProfile;
+  color: string;
 };
 
 type ChatMsg = {
@@ -28,9 +37,13 @@ type ChatMsg = {
 type Resource = { id: string; name: string; type: string; size: string };
 
 /* ─── Constants ─────────────────────────────────── */
-const AVATARS = ["🤖", "🧠", "⚡", "🔬", "🛡️", "🎯", "🔭", "🧬"];
-const ROLES = ["Araştırma Ajanı", "Analiz Ajanı", "Koordinatör", "QA Ajanı", "Veri İşleyici"];
-const PERSONALITIES = ["Analitik", "Yaratıcı", "Sistematik", "Hızlı", "Detaycı"];
+const ROLES = [
+  "Araştırma Ajanı", "Analiz Ajanı", "Koordinatör", "QA Ajanı",
+  "Veri İşleyici", "Geliştirici", "Sosyal Medya", "Pazarlama",
+];
+const VIBES = ["Analitik", "Yaratıcı", "Sistematik", "Hızlı", "Detaycı", "Sakin", "Enerjik"];
+const CREATURES = ["robot", "ghost", "familiar", "sentinel", "oracle", "specialist"];
+const EMOJIS = ["🤖", "🧠", "⚡", "🔬", "🛡️", "🎯", "🔭", "🧬", "🦊", "🐉"];
 const STATUSES: StaffStatus[] = ["active", "idle", "busy", "offline"];
 const STATUS_COLOR: Record<StaffStatus, string> = {
   active: "#22c55e",
@@ -38,10 +51,61 @@ const STATUS_COLOR: Record<StaffStatus, string> = {
   busy: "#ef4444",
   offline: "#6b7280",
 };
+const STAFF_COLORS = [
+  "#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b", "#ef4444",
+  "#10b981", "#ec4899", "#f97316", "#6366f1", "#14b8a6",
+];
+const DESK_ITEMS = [
+  "globe", "books", "coffee", "palette", "camera",
+  "waveform", "shield", "fire", "plant", "laptop",
+];
 
 const RANDOM_NAMES = [
   "Ara-7", "Nexus", "Vela", "Orionis", "Cygnus", "Lyra", "Draco", "Sigma",
 ];
+
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const c = (hash & 0x00ffffff).toString(16).toUpperCase();
+  return "#" + "00000".substring(0, 6 - c.length) + c;
+};
+
+const getDeterministicItem = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  return DESK_ITEMS[Math.abs(hash) % DESK_ITEMS.length];
+};
+
+/** Map Staff → Claw3D OfficeAgent for 3D scene rendering */
+const mapStaffToOfficeAgent = (s: Staff): OfficeAgent => ({
+  id: s.id,
+  name: s.name,
+  subtitle: s.role,
+  status: s.status === "active" || s.status === "busy" ? "working" : s.status === "offline" ? "error" : "idle",
+  color: s.color || stringToColor(s.id),
+  item: getDeterministicItem(s.id),
+  // avatarProfile is intentionally omitted to prevent 3D renderer crashes
+  avatarProfile: null,
+});
+
+const createStaffMember = (overrides: Partial<Staff> & { name: string }): Staff => {
+  const id = Math.random().toString(36).slice(2, 9);
+  const name = overrides.name || RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
+  return {
+    id,
+    name,
+    role: overrides.role || ROLES[Math.floor(Math.random() * ROLES.length)],
+    purpose: overrides.purpose || "",
+    emoji: overrides.emoji || EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    creature: overrides.creature || CREATURES[Math.floor(Math.random() * CREATURES.length)],
+    vibe: overrides.vibe || VIBES[Math.floor(Math.random() * VIBES.length)],
+    responsibilities: overrides.responsibilities || [],
+    status: overrides.status || "active",
+    avatarProfile: overrides.avatarProfile || createAgentAvatarProfileFromSeed(name),
+    color: overrides.color || STAFF_COLORS[Math.floor(Math.random() * STAFF_COLORS.length)],
+  };
+};
 
 const MOCK_RESOURCES: Resource[] = [
   { id: "r1", name: "dataset_q1_2025.csv", type: "CSV", size: "2.4 MB" },
@@ -50,9 +114,9 @@ const MOCK_RESOURCES: Resource[] = [
 ];
 
 const MOCK_STAFF: Staff[] = [
-  { id: "s1", name: "Ara-7", apiKey: "sk-mock-****-1234", personality: "Analitik", status: "active", avatar: "🤖", role: "Araştırma Ajanı" },
-  { id: "s2", name: "Nexus", apiKey: "sk-mock-****-5678", personality: "Hızlı", status: "busy", avatar: "⚡", role: "Koordinatör" },
-  { id: "s3", name: "Vela", apiKey: "sk-mock-****-9012", personality: "Detaycı", status: "idle", avatar: "🔬", role: "QA Ajanı" },
+  createStaffMember({ name: "Ara-7", role: "Araştırma Ajanı", emoji: "🤖", vibe: "Analitik", creature: "robot", status: "active", purpose: "Veri setlerini analiz eder ve anomali tespit eder." }),
+  createStaffMember({ name: "Nexus", role: "Koordinatör", emoji: "⚡", vibe: "Hızlı", creature: "sentinel", status: "busy", purpose: "Ajanlar arası iletişimi yönetir." }),
+  createStaffMember({ name: "Vela", role: "QA Ajanı", emoji: "🔬", vibe: "Detaycı", creature: "oracle", status: "idle", purpose: "Test ve kalite kontrol süreçlerini yürütür." }),
 ];
 
 const MOCK_CHAT: ChatMsg[] = [
@@ -105,21 +169,30 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 /* ─── Staff Add Modal ────────────────────────────── */
 function StaffAddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Staff) => void }) {
   const [name, setName] = useState("");
-  const [apiKey, setApiKey] = useState("sk-mock-****-" + Math.random().toString(36).slice(2, 6));
-  const [personality, setPersonality] = useState(PERSONALITIES[0]);
+  const [role, setRole] = useState(ROLES[0]);
+  const [purpose, setPurpose] = useState("");
+  const [emoji, setEmoji] = useState(EMOJIS[0]);
+  const [creature, setCreature] = useState(CREATURES[0]);
+  const [vibe, setVibe] = useState(VIBES[0]);
   const [status, setStatus] = useState<StaffStatus>("active");
+
+  const previewProfile = useMemo(
+    () => createAgentAvatarProfileFromSeed(name.trim() || "preview"),
+    [name],
+  );
 
   const handleAdd = () => {
     const finalName = name.trim() || RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
-    onAdd({
-      id: randomId(),
+    onAdd(createStaffMember({
       name: finalName,
-      apiKey,
-      personality,
+      role,
+      purpose: purpose.trim(),
+      emoji,
+      creature,
+      vibe,
       status,
-      avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
-      role: ROLES[Math.floor(Math.random() * ROLES.length)],
-    });
+      avatarProfile: createAgentAvatarProfileFromSeed(finalName),
+    }));
     onClose();
   };
 
@@ -133,19 +206,59 @@ function StaffAddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s: Sta
   return (
     <Modal title="Yeni Personel Ekle" onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+        {/* Avatar Preview */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: "0.75rem" }}>
+          <div style={{ width: "3rem", height: "3rem", borderRadius: "50%", background: `linear-gradient(135deg, ${previewProfile.clothing.topColor}, ${previewProfile.hair.color})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem", border: "2px solid rgba(255,255,255,0.1)" }}>
+            {emoji}
+          </div>
+          <div>
+            <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "0.9rem" }}>{name.trim() || "Yeni Personel"}</div>
+            <div style={{ color: "#64748b", fontSize: "0.75rem" }}>{role} · {creature} · {vibe}</div>
+          </div>
+        </div>
+
         <div>
           <label style={labelStyle}>Personel İsmi</label>
           <input style={inputStyle} placeholder="Boş bırakılırsa rastgele atanır..." value={name} onChange={e => setName(e.target.value)} />
         </div>
-        <div>
-          <label style={labelStyle}>API Key (Mockup)</label>
-          <input style={inputStyle} value={apiKey} readOnly />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <div>
+            <label style={labelStyle}>Rol</label>
+            <select style={{ ...inputStyle, cursor: "pointer" }} value={role} onChange={e => setRole(e.target.value)}>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Kişilik (Vibe)</label>
+            <select style={{ ...inputStyle, cursor: "pointer" }} value={vibe} onChange={e => setVibe(e.target.value)}>
+              {VIBES.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
         </div>
         <div>
-          <label style={labelStyle}>Kişilik (Mockup)</label>
-          <select style={{ ...inputStyle, cursor: "pointer" }} value={personality} onChange={e => setPersonality(e.target.value)}>
-            {PERSONALITIES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <label style={labelStyle}>Görev Tanımı (Purpose)</label>
+          <input style={inputStyle} placeholder="Bu ajanın temel amacı nedir?" value={purpose} onChange={e => setPurpose(e.target.value)} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <div>
+            <label style={labelStyle}>Tür (Creature)</label>
+            <select style={{ ...inputStyle, cursor: "pointer" }} value={creature} onChange={e => setCreature(e.target.value)}>
+              {CREATURES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Emoji</label>
+            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+              {EMOJIS.map(e => (
+                <button key={e} onClick={() => setEmoji(e)} style={{
+                  width: "2rem", height: "2rem", borderRadius: "0.4rem", fontSize: "1rem",
+                  border: `2px solid ${emoji === e ? "#3b82f6" : "rgba(255,255,255,0.08)"}`,
+                  background: emoji === e ? "rgba(59,130,246,0.15)" : "transparent",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>{e}</button>
+              ))}
+            </div>
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Statü</label>
@@ -257,8 +370,147 @@ function ServerModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ─── Staff Detail Panel ─────────────────────────── */
+function StaffDetailPanel({ staff, onClose, onStatusChange, onDelete }: {
+  staff: Staff;
+  onClose: () => void;
+  onStatusChange: (id: string, status: StaffStatus) => void;
+  onDelete: (id: string) => void;
+}) {
+  const s = staff;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Reset confirm state when staff changes
+  const staffId = s.id;
+  useState(() => { setConfirmDelete(false); });
+
+  return (
+    <div style={{
+      position: "fixed", top: "4.5rem", left: "252px", zIndex: 30,
+      width: "280px", background: "rgba(13,17,23,0.92)", backdropFilter: "blur(14px)",
+      border: "1px solid rgba(99,179,237,0.18)", borderRadius: "0.875rem",
+      padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase" }}>Personel Detayı</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: "0.15rem" }}>
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Avatar & Name */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)", borderRadius: "0.6rem" }}>
+        <div style={{
+          width: "2.5rem", height: "2.5rem", borderRadius: "50%",
+          background: `linear-gradient(135deg, ${s.avatarProfile.clothing.topColor}, ${s.avatarProfile.hair.color})`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "1.1rem", border: `2px solid ${STATUS_COLOR[s.status]}`, flexShrink: 0,
+        }}>{s.emoji}</div>
+        <div>
+          <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e2e8f0" }}>{s.name}</div>
+          <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{s.role}</div>
+        </div>
+      </div>
+
+      {/* Info rows */}
+      {s.purpose && (
+        <div style={{ padding: "0.5rem", background: "rgba(255,255,255,0.03)", borderRadius: "0.5rem" }}>
+          <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem" }}>Görev</div>
+          <div style={{ fontSize: "0.78rem", color: "#cbd5e1", lineHeight: 1.4 }}>{s.purpose}</div>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+        <div style={{ padding: "0.4rem 0.5rem", background: "rgba(255,255,255,0.03)", borderRadius: "0.4rem" }}>
+          <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tür</div>
+          <div style={{ fontSize: "0.78rem", color: "#e2e8f0" }}>{s.creature}</div>
+        </div>
+        <div style={{ padding: "0.4rem 0.5rem", background: "rgba(255,255,255,0.03)", borderRadius: "0.4rem" }}>
+          <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Kişilik</div>
+          <div style={{ fontSize: "0.78rem", color: "#e2e8f0" }}>{s.vibe}</div>
+        </div>
+      </div>
+
+      {/* Avatar detail */}
+      <div style={{ padding: "0.5rem", background: "rgba(255,255,255,0.03)", borderRadius: "0.5rem" }}>
+        <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.3rem" }}>Avatar Profili</div>
+        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+          {[
+            { label: "Saç", color: s.avatarProfile.hair.color },
+            { label: "Üst", color: s.avatarProfile.clothing.topColor },
+            { label: "Alt", color: s.avatarProfile.clothing.bottomColor },
+            { label: "Ten", color: s.avatarProfile.body.skinTone },
+          ].map(c => (
+            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <div style={{ width: "0.7rem", height: "0.7rem", borderRadius: "50%", background: c.color, border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span style={{ fontSize: "0.65rem", color: "#94a3b8" }}>{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Status change */}
+      <div>
+        <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.3rem" }}>Statü Değiştir</div>
+        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+          {STATUSES.map(st => (
+            <button key={st} onClick={() => onStatusChange(s.id, st)} style={{
+              padding: "0.25rem 0.6rem", borderRadius: "9999px", fontSize: "0.68rem", fontWeight: 600,
+              border: `1.5px solid ${s.status === st ? STATUS_COLOR[st] : "rgba(255,255,255,0.08)"}`,
+              background: s.status === st ? STATUS_COLOR[st] + "22" : "transparent",
+              color: s.status === st ? STATUS_COLOR[st] : "#64748b", cursor: "pointer",
+            }}>{st.toUpperCase()}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Delete — two-step inline confirmation (no confirm dialog) */}
+      {confirmDelete ? (
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button
+            onClick={() => { onDelete(staffId); }}
+            style={{
+              flex: 1, padding: "0.5rem", borderRadius: "0.5rem", fontSize: "0.78rem", fontWeight: 700,
+              background: "rgba(239,68,68,0.25)", border: "1px solid rgba(239,68,68,0.6)",
+              color: "#fca5a5", cursor: "pointer",
+            }}
+          >
+            Evet, Sil
+          </button>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            style={{
+              flex: 1, padding: "0.5rem", borderRadius: "0.5rem", fontSize: "0.78rem", fontWeight: 600,
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+              color: "#94a3b8", cursor: "pointer",
+            }}
+          >
+            Vazgeç
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          style={{
+            padding: "0.5rem", borderRadius: "0.5rem", fontSize: "0.78rem", fontWeight: 600,
+            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)",
+            color: "#f87171", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem",
+          }}
+        >
+          <X size={13} /> Personeli Sil
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ─── Staff List Sidebar ─────────────────────────── */
-function StaffList({ staff, onAddClick }: { staff: Staff[]; onAddClick: () => void }) {
+function StaffList({ staff, selectedId, onSelect, onAddClick }: {
+  staff: Staff[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onAddClick: () => void;
+}) {
   return (
     <div style={{
       position: "absolute", top: "4.5rem", left: "1rem", zIndex: 20,
@@ -273,8 +525,21 @@ function StaffList({ staff, onAddClick }: { staff: Staff[]; onAddClick: () => vo
         </button>
       </div>
       {staff.map(s => (
-        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.5rem", background: "rgba(255,255,255,0.04)", borderRadius: "0.5rem" }}>
-          <span style={{ fontSize: "1rem" }}>{s.avatar}</span>
+        <div
+          key={s.id}
+          onClick={() => onSelect(selectedId === s.id ? null : s.id)}
+          style={{
+            display: "flex", alignItems: "center", gap: "0.6rem",
+            padding: "0.4rem 0.5rem",
+            background: selectedId === s.id ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.04)",
+            border: selectedId === s.id ? "1px solid rgba(59,130,246,0.25)" : "1px solid transparent",
+            borderRadius: "0.5rem", cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <div style={{ width: "1.6rem", height: "1.6rem", borderRadius: "50%", background: `linear-gradient(135deg, ${s.avatarProfile.clothing.topColor}, ${s.avatarProfile.hair.color})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", flexShrink: 0, border: `1.5px solid ${STATUS_COLOR[s.status]}` }}>
+            {s.emoji}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
             <div style={{ fontSize: "0.68rem", color: "#64748b" }}>{s.role}</div>
@@ -356,17 +621,43 @@ export function ContextMedShell() {
   const [showPhone, setShowPhone] = useState(false);
   const [showMeeting, setShowMeeting] = useState(false);
   const [showServer, setShowServer] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  /** Map all staff members to Claw3D OfficeAgent[] for 3D scene rendering */
+  const officeAgents: OfficeAgent[] = useMemo(
+    () => staff.map(mapStaffToOfficeAgent),
+    [staff],
+  );
+
+  const selectedStaff = useMemo(
+    () => staff.find(s => s.id === selectedStaffId) ?? null,
+    [staff, selectedStaffId],
+  );
+
+  const handleStatusChange = (id: string, status: StaffStatus) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+  };
+
+  const handleDelete = (id: string) => {
+    setStaff(prev => prev.filter(s => s.id !== id));
+    setSelectedStaffId(null);
+  };
 
   return (
     // Outermost: position context for all overlays
     <div style={{ position: "relative", width: "100%", height: "100vh", overflow: "hidden", background: "#000" }}>
 
-      {/* ── 3D Office fills the entire screen, pointer-events fully on so 3D obje clicks work ── */}
-      <RetroOffice3D 
-        agents={[]} 
+      {/* ── 3D Office fills the entire screen ── */}
+      {/* avatarProfile=null in mapping prevents 3D renderer crashes; deletion works via sidebar UI */}
+      <RetroOffice3D
+        agents={officeAgents}
+        taskManagerEnabled={false}
         onPhoneBoothClick={() => setShowPhone(true)}
         onServerRackClick={() => setShowServer(true)}
         onStandupStartRequested={() => setShowMeeting(true)}
+        onKanbanInteract={() => { /* kanban devre dışı */ }}
+        onJukeboxInteract={() => { /* jukebox devre dışı */ }}
+        onAgentChatSelect={() => { /* agent chat devre dışı */ }}
       />
 
       {/* ── Overlay layer: pointer-events:none so clicks pass through to 3D, children opt-in ── */}
@@ -384,6 +675,10 @@ export function ContextMedShell() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "2rem", height: "2rem", borderRadius: "0.4rem", background: "linear-gradient(135deg,#3b82f6,#06b6d4)", fontWeight: 800, fontSize: "0.9rem", color: "#fff" }}>C</div>
           <h1 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>Context-Med Karargahı</h1>
           <div style={{ flex: 1 }} />
+          {/* Personnel count badge */}
+          <div style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 500 }}>
+            {staff.filter(s => s.status === "active" || s.status === "busy").length}/{staff.length} aktif
+          </div>
           <button onClick={() => setShowAddModal(true)} style={{
             display: "flex", alignItems: "center", gap: "0.4rem",
             background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.35)",
@@ -394,17 +689,45 @@ export function ContextMedShell() {
           </button>
           <div style={{ display: "flex", gap: "0.35rem" }}>
             {staff.slice(0, 5).map(s => (
-              <div key={s.id} title={s.name} style={{ width: "1.85rem", height: "1.85rem", borderRadius: "50%", background: "rgba(30,41,59,0.9)", border: `2px solid ${STATUS_COLOR[s.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", cursor: "default" }}>
-                {s.avatar}
+              <div key={s.id} title={`${s.name} — ${s.role}`} style={{
+                width: "1.85rem", height: "1.85rem", borderRadius: "50%",
+                background: `linear-gradient(135deg, ${s.avatarProfile.clothing.topColor}, ${s.avatarProfile.hair.color})`,
+                border: `2px solid ${STATUS_COLOR[s.status]}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.75rem", cursor: "pointer",
+              }} onClick={() => setSelectedStaffId(s.id)}>
+                {s.emoji}
               </div>
             ))}
+            {staff.length > 5 && (
+              <div style={{ width: "1.85rem", height: "1.85rem", borderRadius: "50%", background: "rgba(30,41,59,0.9)", border: "2px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", color: "#94a3b8", cursor: "default" }}>
+                +{staff.length - 5}
+              </div>
+            )}
           </div>
         </header>
 
         {/* Staff list — pointer-events:auto */}
         <div style={{ pointerEvents: "auto" }}>
-          <StaffList staff={staff} onAddClick={() => setShowAddModal(true)} />
+          <StaffList
+            staff={staff}
+            selectedId={selectedStaffId}
+            onSelect={setSelectedStaffId}
+            onAddClick={() => setShowAddModal(true)}
+          />
         </div>
+
+        {/* Staff detail panel — pointer-events:auto */}
+        {selectedStaff && (
+          <div style={{ pointerEvents: "auto" }}>
+            <StaffDetailPanel
+              staff={selectedStaff}
+              onClose={() => setSelectedStaffId(null)}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
+            />
+          </div>
+        )}
 
         {/* Agent chat — pointer-events:auto */}
         <div style={{ pointerEvents: "auto" }}>
@@ -426,3 +749,4 @@ export function ContextMedShell() {
     </div>
   );
 }
+

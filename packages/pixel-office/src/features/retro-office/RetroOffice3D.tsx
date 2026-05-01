@@ -4626,6 +4626,8 @@ export function RetroOffice3D({
         return;
       }
       if (item.type === "atm") {
+        // Only open ATM overlay if analytics data is available, otherwise ignore click
+        if (!atmAnalytics) return;
         setFollowAgentId(null);
         setActiveKanbanUid(null);
         setActiveGithubTerminalUid(null);
@@ -4679,6 +4681,8 @@ export function RetroOffice3D({
         return;
       }
       if (item.type === "server_terminal") {
+        // Only open terminal overlay if github skill is configured
+        if (!githubSkill) return;
         setFollowAgentId(null);
         setActiveKanbanUid(null);
         setActiveAtmUid(null);
@@ -4705,6 +4709,8 @@ export function RetroOffice3D({
         item.type === "device_rack" ||
         item.type === "test_bench"
       ) {
+        // Only open QA overlay if a qaTestingAgentId is set (feature is active)
+        if (!qaTestingAgentId) return;
         setFollowAgentId(null);
         setActiveKanbanUid(null);
         setActiveAtmUid(null);
