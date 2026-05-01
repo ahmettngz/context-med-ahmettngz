@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com) — [Semantic Versioning]
 
 ## [Unreleased]
 
+## [context-doctor-v0.1.0] — 2026-05-01
+
+### Katkıda Bulunan
+- seyyah
+
+### İyileştirmeler
+- 📦 context-doctor paketi güncellendi.
+- context-doctor
+
+
 ## [istabot-nokta-v0.1.0] — 2026-04-25
 
 ### Katkıda Bulunan
